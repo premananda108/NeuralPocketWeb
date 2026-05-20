@@ -118,31 +118,33 @@ async function downloadAndCacheModel(modelUrl: string, cacheFilename: string): P
   const contentLength = parseInt(response.headers.get('Content-Length') || '0')
   const totalMB = contentLength > 0 ? contentLength / 1_048_576 : 0
 
-  let fileHandle
-  let writable
+  const root = await navigator.storage.getDirectory()
+  // Ensure the file is created first
+  const fileHandle = await root.getFileHandle(cacheFilename, { create: true })
+
+  // Open high-performance sync access handle
+  let accessHandle: any
   let retries = 3
-  
   while (retries > 0) {
     try {
-      const root = await navigator.storage.getDirectory()
-      // 1. Ensure the file is created first
-      await root.getFileHandle(cacheFilename, { create: true })
-      // 2. Fetch a completely fresh file handle to ensure the browser's cache is fully updated
-      fileHandle = await root.getFileHandle(cacheFilename)
-      // 3. Obtain the writable stream from the fresh handle
-      writable = await fileHandle.createWritable()
+      accessHandle = await (fileHandle as any).createSyncAccessHandle()
       break
     } catch (err: any) {
-      console.warn(`[AI Worker] Failed to acquire writable stream (attempts left: ${retries - 1}):`, err)
-      if (err?.name === 'InvalidStateError' || err?.message?.includes('state cached')) {
-        retries--
-        if (retries > 0) {
-          await new Promise(resolve => setTimeout(resolve, 500))
-          continue
-        }
+      console.warn(`[AI Worker] Failed to acquire sync access handle (attempts left: ${retries - 1}):`, err)
+      retries--
+      if (retries > 0) {
+        await new Promise(resolve => setTimeout(resolve, 500))
+        continue
       }
       throw err
     }
+  }
+
+  // Clear any existing content in the file first to ensure we write from scratch
+  try {
+    accessHandle.truncate(0)
+  } catch (err) {
+    console.warn('[AI Worker] Truncate failed, continuing:', err)
   }
 
   const reader = response.body!.getReader()
@@ -153,7 +155,8 @@ async function downloadAndCacheModel(modelUrl: string, cacheFilename: string): P
     while (true) {
       const { done, value } = await reader.read()
       if (done) break
-      await writable.write(value)
+      // Write chunk at the current offset
+      accessHandle.write(value, { at: receivedBytes })
       receivedBytes += value.byteLength
       const now = Date.now()
       if (now - lastReport > 400) {
@@ -166,18 +169,19 @@ async function downloadAndCacheModel(modelUrl: string, cacheFilename: string): P
         })
       }
     }
-    await writable.close()
+    accessHandle.flush()
+    accessHandle.close()
     console.log(`[AI Worker] Download complete: ${cacheFilename} (${(receivedBytes / 1_048_576).toFixed(1)} MB)`)
   } catch (error) {
-    await writable.abort()
     try {
-      const root = await navigator.storage.getDirectory()
+      accessHandle.close()
+    } catch { /* ignore */ }
+    try {
       await root.removeEntry(cacheFilename)
     } catch { /* ignore */ }
     throw error
   }
 
-  const root = await navigator.storage.getDirectory()
   const freshFileHandle = await root.getFileHandle(cacheFilename)
   return await freshFileHandle.getFile()
 }
