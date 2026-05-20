@@ -5,7 +5,7 @@
  */
 export function cleanGemmaOutput(text: string): string {
   return text
-    .replace(/<start_of_turn>[^<]*<\/start_of_turn>/g, '')
+    .replace(/<start_of_turn>user[^<]*<end_of_turn>\n?/g, '')
     .replace(/<start_of_turn>\w*\n?/g, '')
     .replace(/<\/?(?:start|end)_of_turn>/g, '')
     .replace(/<(?:bos|eos)>/g, '')
