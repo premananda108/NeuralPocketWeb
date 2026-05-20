@@ -5,7 +5,7 @@ interface OnboardingScreenProps {
 }
 
 const features = [
-  { icon: '📷', title: 'Photo & Text', description: 'Send any image — menus, signs, documents, broken things — and get instant answers' },
+  { icon: '📷🎙️', title: 'Vision & Audio', description: 'Send photos or audio recordings — analyze images, transcribe/understand speech instantly' },
   { icon: '🤖', title: 'On-Device AI',  description: 'Powered by Gemma 4 — runs entirely in your browser, no cloud needed' },
   { icon: '🔒', title: '100% Private',  description: 'Nothing leaves your device. Works fully offline and in airplane mode.' },
   { icon: '💬', title: 'Any Topic',  description: 'Ask anything: translate, explain, summarize, brainstorm, solve problems' },
@@ -71,10 +71,9 @@ export default function OnboardingScreen({ onContinue }: OnboardingScreenProps) 
 
         <p style={{
           color: 'var(--text-secondary)', textAlign: 'center',
-          fontSize: 16, marginBottom: 36, lineHeight: 1.6, maxWidth: 380,
+          fontSize: 16, marginBottom: 36, lineHeight: 1.6, maxWidth: 390,
         }}>
-          Your personal AI assistant — running entirely on your device.
-          No internet. No servers. No data leaving your hands.
+          Your personal AI assistant — analyze images, transcribe audio, and chat with complete on-device privacy. No internet required.
         </p>
 
         {/* Feature cards */}
