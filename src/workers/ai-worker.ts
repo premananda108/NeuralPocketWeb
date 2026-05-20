@@ -4,6 +4,7 @@
 
 import type { LlmInference } from '@mediapipe/tasks-genai'
 import { DEFAULT_SYSTEM_PROMPT } from '../constants'
+import { getCacheFilename } from '../utils/chatHelpers'
 
 let FilesetResolver: any = null
 let LlmInferenceClass: any = null
@@ -67,15 +68,6 @@ self.onmessage = async (event: MessageEvent) => {
 
 // ─── OPFS cache helpers ────────────────────────────────────────────────────
 
-function getCacheFilename(modelUrl: string): string {
-  const filename = modelUrl.split('/').pop()!.split('?')[0]
-  const extension = filename?.split('.').pop()?.toLowerCase();
-  const knownExtensions = ['task', 'litertlm', 'bin'];
-  if (filename && extension && knownExtensions.includes(extension)) {
-    return filename
-  }
-  return 'gemma-model.task'
-}
 
 async function getModelFromOPFS(cacheFilename: string): Promise<File | null> {
   let retries = 3

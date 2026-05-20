@@ -1,17 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { DEFAULT_SYSTEM_PROMPT } from '../constants';
-
-/**
- * Strip Gemma chat-template special tokens from the accumulated output.
- */
-function cleanGemmaOutput(text: string): string {
-  return text
-    .replace(/<start_of_turn>[^<]*<\/start_of_turn>/g, '')
-    .replace(/<start_of_turn>\w*\n?/g, '')
-    .replace(/<\/?(?:start|end)_of_turn>/g, '')
-    .replace(/<(?:bos|eos)>/g, '')
-    .replace(/^[\s\n]+/, '');
-}
+import { cleanGemmaOutput } from '../utils/chatHelpers';
 
 export const DEFAULT_MODEL_URL =
   'https://pub-b07512464f924792a1bb4c7b3571db1e.r2.dev/gemma-4-E2B-it-web.task';

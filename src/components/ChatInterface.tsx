@@ -1,6 +1,7 @@
 import { useState, useRef, useEffect, useCallback } from 'react';
 import { DEFAULT_SYSTEM_PROMPT } from '../constants';
 import { MODELS_LIST, decodeAudioFile } from '../hooks/useGemmaModel';
+import { getHistoryTurns } from '../utils/chatHelpers';
 
 /* ─── Types ─── */
 interface Message {
@@ -694,10 +695,7 @@ export default function ChatInterface({
     setPendingAudio(null);
 
     // Map current chat messages to simple role/text history, sliced by contextDepth * 2
-    const sliceCount = contextDepth * 2;
-    const history = sliceCount > 0
-      ? (activeChat?.messages.slice(-sliceCount).map(m => ({ role: m.role, text: m.text })) || [])
-      : [];
+    const history = getHistoryTurns(activeChat?.messages || [], contextDepth);
 
     // Pass this chat's systemPrompt, image base64, resampled audio PCM, and history to the model
     onSendPrompt(finalText, pendingImage?.base64, audioPCM, activeChat?.systemPrompt, history);
