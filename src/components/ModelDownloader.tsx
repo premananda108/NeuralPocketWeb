@@ -69,14 +69,17 @@ export default function ModelDownloader({
       }}>
 
         {/* ── Logo ── */}
-        <div style={{
-          width: 72, height: 72, borderRadius: 22,
-          background: 'linear-gradient(135deg, #2AABEE, #1A8CC8)',
-          display: 'flex', alignItems: 'center', justifyContent: 'center',
-          fontSize: 34, boxShadow: '0 8px 30px rgba(42,171,238,0.3)',
-        }}>
-          🧠
-        </div>
+        <img
+          src="/apple-touch-icon.png"
+          alt="NeuralPocket Logo"
+          style={{
+            width: 72,
+            height: 72,
+            borderRadius: 20,
+            boxShadow: '0 8px 30px rgba(42,171,238,0.2)',
+            objectFit: 'cover',
+          }}
+        />
 
         {/* ── Model Selection (Idle state) ── */}
         {(status === 'idle') && (

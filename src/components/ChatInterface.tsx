@@ -196,7 +196,12 @@ function Drawer({
       <div className="drawer">
         {/* header */}
         <div className="drawer-header">
-          <div className="drawer-avatar">🧠</div>
+          <img
+            src="/apple-touch-icon.png"
+            alt="NeuralPocket Logo"
+            className="drawer-avatar"
+            style={{ objectFit: 'cover' }}
+          />
           <div>
             <div style={{ fontWeight: 700, fontSize: 16, lineHeight: 1.2 }}>NeuralPocket</div>
             <div style={{ fontSize: 11, opacity: 0.8, marginTop: 2 }}>On-device AI · Gemma 4</div>
@@ -690,10 +695,17 @@ export default function ChatInterface({
               display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
               minHeight: '60vh', gap: 12, opacity: 0.5,
             }}>
-              <div style={{
-                width: 64, height: 64, borderRadius: '50%', background: '#2AABEE',
-                display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 28,
-              }}>🧠</div>
+              <img
+                src="/apple-touch-icon.png"
+                alt="NeuralPocket Logo"
+                style={{
+                  width: 64,
+                  height: 64,
+                  borderRadius: 16,
+                  boxShadow: '0 4px 20px rgba(42,171,238,0.15)',
+                  objectFit: 'cover',
+                }}
+              />
               <div style={{ fontWeight: 600, fontSize: 15, color: 'var(--text-primary)' }}>
                 NeuralPocket
               </div>

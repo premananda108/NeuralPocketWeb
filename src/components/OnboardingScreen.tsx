@@ -50,14 +50,17 @@ export default function OnboardingScreen({ onContinue }: OnboardingScreenProps) 
       }}>
         {/* Logo */}
         <div className="float" style={{ marginBottom: 28 }}>
-          <div style={{
-            width: 88, height: 88, borderRadius: 28,
-            background: 'linear-gradient(135deg, #2AABEE, #1A8CC8)',
-            display: 'flex', alignItems: 'center', justifyContent: 'center',
-            fontSize: 42, boxShadow: '0 12px 40px rgba(42,171,238,0.35)',
-          }}>
-            🧠
-          </div>
+          <img
+            src="/apple-touch-icon.png"
+            alt="NeuralPocket Logo"
+            style={{
+              width: 88,
+              height: 88,
+              borderRadius: 24,
+              boxShadow: '0 12px 40px rgba(42,171,238,0.25)',
+              objectFit: 'cover',
+            }}
+          />
         </div>
 
         {/* Title */}
