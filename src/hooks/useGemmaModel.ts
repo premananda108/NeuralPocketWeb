@@ -33,7 +33,7 @@ export const MODELS_LIST = [
     id: 'gemma-3n-e2b-vision-audio',
     name: 'Gemma 3 Multimodal',
     description: 'Supports text, images, and audio files (~3 GB)',
-    url: 'http://localhost:5173/gemma-3n-E2B-it-int4-Web.litertlm',
+    url: 'https://pub-b07512464f924792a1bb4c7b3571db1e.r2.dev/gemma-3n-E2B-it-int4-Web.litertlm',
   }
 ];
 
