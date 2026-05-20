@@ -351,66 +351,89 @@ async function handlePrompt(
     }
 
     if (hasMultimodal) {
-      const promptParts: any[] = [`<start_of_turn>user\n${sysPrompt}\n\n`]
+      const promptParts: any[] = []
 
-      // Add context history (up to last 20 messages = 10 exchanges)
+      // If history is present, format history turns with system prompt in the first user turn
       if (history && history.length > 0) {
         const recentHistory = history.slice(-20)
-        recentHistory.forEach(msg => {
+        recentHistory.forEach((msg, idx) => {
           if (msg.role === 'user') {
-            promptParts.push(`${msg.text}\n<end_of_turn>\n`)
+            const content = idx === 0 ? `${sysPrompt}\n\n${msg.text}` : msg.text
+            promptParts.push(`<start_of_turn>user\n${content}\n<end_of_turn>\n`)
           } else {
             promptParts.push(`<start_of_turn>model\n${msg.text}\n<end_of_turn>\n`)
           }
         })
-      }
 
-      promptParts.push(`<start_of_turn>user\n`)
-
-      if (imageBase64) {
-        try {
-          imageBitmap = await base64ToImageBitmap(imageBase64)
-          promptParts.push({ imageSource: imageBitmap })
-        } catch (err) {
-          console.error('[AI Worker] Failed to convert image to ImageBitmap:', err)
-          promptParts.push(`\n[Failed to load image: ${err instanceof Error ? err.message : String(err)}]\n`)
-        }
-      }
-
-      if (audioRaw) {
-        promptParts.push({
-          audioSource: {
-            audioSamples: audioRaw,
-            audioSampleRateHz: 16000,
+        // Current turn begins as a fresh user turn containing only the current media inputs
+        promptParts.push(`<start_of_turn>user\n`)
+        if (imageBase64) {
+          try {
+            imageBitmap = await base64ToImageBitmap(imageBase64)
+            promptParts.push({ imageSource: imageBitmap })
+          } catch (err) {
+            console.error('[AI Worker] Failed to convert image to ImageBitmap:', err)
+            promptParts.push(`\n[Failed to load image]\n`)
           }
-        })
+        }
+        if (audioRaw) {
+          promptParts.push({
+            audioSource: {
+              audioSamples: audioRaw,
+              audioSampleRateHz: 16000,
+            }
+          })
+        }
+        promptParts.push(`\n${userText || 'Describe the input.'}\n<end_of_turn>\n<start_of_turn>model\n`)
+      } else {
+        // No history: single turn starting with the system prompt, containing the media inputs and user query
+        promptParts.push(`<start_of_turn>user\n${sysPrompt}\n\n`)
+        if (imageBase64) {
+          try {
+            imageBitmap = await base64ToImageBitmap(imageBase64)
+            promptParts.push({ imageSource: imageBitmap })
+          } catch (err) {
+            console.error('[AI Worker] Failed to convert image to ImageBitmap:', err)
+            promptParts.push(`\n[Failed to load image]\n`)
+          }
+        }
+        if (audioRaw) {
+          promptParts.push({
+            audioSource: {
+              audioSamples: audioRaw,
+              audioSampleRateHz: 16000,
+            }
+          })
+        }
+        promptParts.push(`\n${userText || 'Describe the input.'}\n<end_of_turn>\n<start_of_turn>model\n`)
       }
 
-      promptParts.push(`\n${userText || 'Describe the input.'}\n<end_of_turn>\n<start_of_turn>model\n`)
       prompt = promptParts
     } else {
       // Pure text chat
-      let promptText = `<start_of_turn>user\n${sysPrompt}\n\n`
+      let promptText = ''
 
       if (history && history.length > 0) {
         const recentHistory = history.slice(-20)
-        recentHistory.forEach(msg => {
+        recentHistory.forEach((msg, idx) => {
           if (msg.role === 'user') {
-            promptText += `${msg.text}\n<end_of_turn>\n`
+            const content = idx === 0 ? `${sysPrompt}\n\n${msg.text}` : msg.text
+            promptText += `<start_of_turn>user\n${content}\n<end_of_turn>\n`
           } else {
             promptText += `<start_of_turn>model\n${msg.text}\n<end_of_turn>\n`
           }
         })
+        promptText += `<start_of_turn>user\n${userText}\n<end_of_turn>\n<start_of_turn>model\n`
+      } else {
+        promptText += `<start_of_turn>user\n${sysPrompt}\n\n${userText}\n<end_of_turn>\n<start_of_turn>model\n`
       }
 
-      promptText += `<start_of_turn>user\n${userText}\n<end_of_turn>\n<start_of_turn>model\n`
       prompt = promptText
     }
   } catch (err) {
     console.error('[AI Worker] Failed to build multimodal prompt:', err)
     prompt =
-      `<start_of_turn>user\n${sysPrompt}\n\n` +
-      `${userText}\n<end_of_turn>\n<start_of_turn>model\n`
+      `<start_of_turn>user\n${sysPrompt}\n\n${userText}\n<end_of_turn>\n<start_of_turn>model\n`
   }
 
   let rawBuffer = ''
