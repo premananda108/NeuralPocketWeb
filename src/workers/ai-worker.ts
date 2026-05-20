@@ -69,7 +69,12 @@ self.onmessage = async (event: MessageEvent) => {
 
 function getCacheFilename(modelUrl: string): string {
   const filename = modelUrl.split('/').pop()!.split('?')[0]
-  return filename?.endsWith('.task') ? filename : 'gemma-model.task'
+  const extension = filename?.split('.').pop()?.toLowerCase();
+  const knownExtensions = ['task', 'litertlm', 'bin'];
+  if (filename && extension && knownExtensions.includes(extension)) {
+    return filename
+  }
+  return 'gemma-model.task'
 }
 
 async function getModelFromOPFS(cacheFilename: string): Promise<File | null> {
@@ -142,10 +147,14 @@ async function clearCache(modelUrl?: string) {
     if (modelUrl) {
       await root.removeEntry(getCacheFilename(modelUrl))
     } else {
+      const knownExtensions = ['.task', '.litertlm', '.bin']
       // @ts-ignore - values() is available on OPFS directory handles
       for await (const entry of root.values()) {
-        if (entry.kind === 'file' && entry.name.endsWith('.task')) {
-          await root.removeEntry(entry.name)
+        if (entry.kind === 'file') {
+          const isModelFile = knownExtensions.some(ext => entry.name.toLowerCase().endsWith(ext))
+          if (isModelFile) {
+            await root.removeEntry(entry.name)
+          }
         }
       }
     }
