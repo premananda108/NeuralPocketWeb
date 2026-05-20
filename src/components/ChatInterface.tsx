@@ -569,7 +569,7 @@ export default function ChatInterface({
 
     const userMsg: Message = {
       id: userMsgId, role: 'user', text: finalText,
-      imagePreview: pendingImage?.preview, time: t,
+      imagePreview: pendingImage?.base64, time: t,
     };
     const aiMsg: Message = {
       id: aiMsgId, role: 'ai', text: '', time: t, isStreaming: true,
