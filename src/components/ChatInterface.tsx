@@ -244,10 +244,11 @@ function Drawer({
             const isActive = chat.id === activeChatId;
             const hasCustomPrompt = chat.systemPrompt !== DEFAULT_SYSTEM_PROMPT;
             return (
-              <button
+              <div
                 key={chat.id}
                 className={`chat-list-item${isActive ? ' active' : ''}`}
                 onClick={() => { onSelectChat(chat.id); onClose(); }}
+                style={{ cursor: 'pointer' }}
               >
                 <div className="chat-list-avatar">
                   {chat.title.charAt(0).toUpperCase()}
@@ -290,7 +291,7 @@ function Drawer({
                 >
                   <IconTrash />
                 </button>
-              </button>
+              </div>
             );
           })}
         </div>
@@ -411,7 +412,10 @@ export default function ChatInterface({
   /* ── chats state ── */
   const [allChats, setAllChats] = useState<Chat[]>(() => {
     const saved = loadChats();
-    return saved.length > 0 ? saved : [createChat()];
+    if (saved.length > 0) return saved;
+    const defaultChat = createChat();
+    saveChats([defaultChat]);
+    return [defaultChat];
   });
   const [activeChatId, setActiveChatId] = useState<string>(() => {
     const saved = loadChats();
@@ -559,7 +563,7 @@ export default function ChatInterface({
     if (!text && !pendingImage && !pendingAudio) return;
     if (isGenerating) return;
 
-    const chatId = activeChatId;
+    const chatId = activeChatId || activeChat.id;
     const userMsgId = uid();
     const aiMsgId = uid();
     const t = now();
