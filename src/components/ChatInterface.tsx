@@ -25,7 +25,13 @@ interface ChatInterfaceProps {
   streamingText: string;
   isGenerating: boolean;
   error: string | null;
-  onSendPrompt: (text: string, imageBase64?: string, audioRaw?: Float32Array, systemPrompt?: string) => void;
+  onSendPrompt: (
+    text: string,
+    imageBase64?: string,
+    audioRaw?: Float32Array,
+    systemPrompt?: string,
+    history?: { role: 'user' | 'ai'; text: string }[]
+  ) => void;
   onAbort: () => void;
   onReset: () => void;
   isDark: boolean;
@@ -591,8 +597,11 @@ export default function ChatInterface({
     updatePendingImage(null);
     setPendingAudio(null);
 
-    // Pass this chat's systemPrompt, image base64, and resampled audio PCM to the model
-    onSendPrompt(finalText, pendingImage?.base64, audioPCM, activeChat?.systemPrompt);
+    // Map current chat messages to simple role/text history to pass context memory
+    const history = activeChat?.messages.map(m => ({ role: m.role, text: m.text })) || [];
+
+    // Pass this chat's systemPrompt, image base64, resampled audio PCM, and history to the model
+    onSendPrompt(finalText, pendingImage?.base64, audioPCM, activeChat?.systemPrompt, history);
   };
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {

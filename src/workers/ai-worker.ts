@@ -46,7 +46,7 @@ if (typeof (self as any).AudioContext === 'undefined') {
 // ─── Message handler ───────────────────────────────────────────────────────
 
 self.onmessage = async (event: MessageEvent) => {
-  const { type, modelUrl, text, imageBase64, audioRaw, systemPrompt } = event.data
+  const { type, modelUrl, text, imageBase64, audioRaw, systemPrompt, history } = event.data
   console.log(`[AI Worker] Received event: ${type}`, { modelUrl })
 
   switch (type) {
@@ -54,7 +54,7 @@ self.onmessage = async (event: MessageEvent) => {
       await handleInit(modelUrl)
       break
     case 'PROMPT':
-      await handlePrompt(text, imageBase64, audioRaw, systemPrompt)
+      await handlePrompt(text, imageBase64, audioRaw, systemPrompt, history)
       break
     case 'ABORT':
       isGenerating = false
@@ -338,7 +338,8 @@ async function handlePrompt(
   userText: string,
   imageBase64?: string,
   audioRaw?: Float32Array,
-  systemPrompt?: string
+  systemPrompt?: string,
+  history?: { role: 'user' | 'ai'; text: string }[]
 ) {
   if (!llmInstance || isGenerating) return
   isGenerating = true
@@ -348,37 +349,66 @@ async function handlePrompt(
   let prompt: string | any[] = ''
 
   try {
-    const promptParts: any[] = [`<start_of_turn>user\n${sysPrompt}\n\n`]
     let hasMultimodal = false
-
-    if (imageBase64) {
-      try {
-        imageBitmap = await base64ToImageBitmap(imageBase64)
-        promptParts.push({ imageSource: imageBitmap })
-        hasMultimodal = true
-      } catch (err) {
-        console.error('[AI Worker] Failed to convert image to ImageBitmap:', err)
-        promptParts.push(`\n[Failed to load image: ${err instanceof Error ? err.message : String(err)}]\n`)
-      }
-    }
-
-    if (audioRaw) {
-      promptParts.push({
-        audioSource: {
-          audioSamples: audioRaw,
-          audioSampleRateHz: 16000,
-        }
-      })
+    if (imageBase64 || audioRaw) {
       hasMultimodal = true
     }
 
     if (hasMultimodal) {
+      const promptParts: any[] = [`<start_of_turn>user\n${sysPrompt}\n\n`]
+
+      // Add context history (up to last 10 messages = 5 exchanges)
+      if (history && history.length > 0) {
+        const recentHistory = history.slice(-10)
+        recentHistory.forEach(msg => {
+          if (msg.role === 'user') {
+            promptParts.push(`${msg.text}\n<end_of_turn>\n`)
+          } else {
+            promptParts.push(`<start_of_turn>model\n${msg.text}\n<end_of_turn>\n`)
+          }
+        })
+      }
+
+      promptParts.push(`<start_of_turn>user\n`)
+
+      if (imageBase64) {
+        try {
+          imageBitmap = await base64ToImageBitmap(imageBase64)
+          promptParts.push({ imageSource: imageBitmap })
+        } catch (err) {
+          console.error('[AI Worker] Failed to convert image to ImageBitmap:', err)
+          promptParts.push(`\n[Failed to load image: ${err instanceof Error ? err.message : String(err)}]\n`)
+        }
+      }
+
+      if (audioRaw) {
+        promptParts.push({
+          audioSource: {
+            audioSamples: audioRaw,
+            audioSampleRateHz: 16000,
+          }
+        })
+      }
+
       promptParts.push(`\n${userText || 'Describe the input.'}\n<end_of_turn>\n<start_of_turn>model\n`)
       prompt = promptParts
     } else {
-      prompt =
-        `<start_of_turn>user\n${sysPrompt}\n\n` +
-        `${userText}\n<end_of_turn>\n<start_of_turn>model\n`
+      // Pure text chat
+      let promptText = `<start_of_turn>user\n${sysPrompt}\n\n`
+
+      if (history && history.length > 0) {
+        const recentHistory = history.slice(-10)
+        recentHistory.forEach(msg => {
+          if (msg.role === 'user') {
+            promptText += `${msg.text}\n<end_of_turn>\n`
+          } else {
+            promptText += `<start_of_turn>model\n${msg.text}\n<end_of_turn>\n`
+          }
+        })
+      }
+
+      promptText += `<start_of_turn>user\n${userText}\n<end_of_turn>\n<start_of_turn>model\n`
+      prompt = promptText
     }
   } catch (err) {
     console.error('[AI Worker] Failed to build multimodal prompt:', err)

@@ -62,7 +62,13 @@ export interface UseGemmaModelReturn {
   selectModel: (url: string) => void;
   initModel: (modelUrl?: string) => void;
   /** systemPrompt is now passed per-call, not stored globally */
-  sendPrompt: (text: string, imageBase64?: string, audioRaw?: Float32Array, systemPrompt?: string) => void;
+  sendPrompt: (
+    text: string,
+    imageBase64?: string,
+    audioRaw?: Float32Array,
+    systemPrompt?: string,
+    history?: { role: 'user' | 'ai'; text: string }[]
+  ) => void;
   abortGeneration: () => void;
   resetChat: () => void;
   clearModelCache: (modelUrl?: string) => void;
@@ -202,7 +208,13 @@ export function useGemmaModel(): UseGemmaModelReturn {
    * Falls back to DEFAULT_SYSTEM_PROMPT if not provided.
    */
   const sendPrompt = useCallback(
-    (text: string, imageBase64?: string, audioRaw?: Float32Array, systemPrompt?: string) => {
+    (
+      text: string,
+      imageBase64?: string,
+      audioRaw?: Float32Array,
+      systemPrompt?: string,
+      history?: { role: 'user' | 'ai'; text: string }[]
+    ) => {
       if (status !== 'ready' || !workerRef.current) return;
       setStreamingText('');
       setIsGenerating(true);
@@ -217,6 +229,7 @@ export function useGemmaModel(): UseGemmaModelReturn {
         imageBase64,
         audioRaw,
         systemPrompt: systemPrompt ?? DEFAULT_SYSTEM_PROMPT,
+        history,
       }, transferables);
     },
     [status]
