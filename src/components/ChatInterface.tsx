@@ -183,6 +183,7 @@ function Drawer({
   chats, activeChatId, onSelectChat, onNewChat, onDeleteChat,
   isDark, onToggleTheme, onClose,
   selectedModelUrl, onSelectModel, onClearCache,
+  contextDepth, onContextDepthChange,
 }: {
   chats: Chat[];
   activeChatId: string;
@@ -195,6 +196,8 @@ function Drawer({
   selectedModelUrl: string;
   onSelectModel: (url: string) => void;
   onClearCache: (modelUrl?: string) => void;
+  contextDepth: number;
+  onContextDepthChange: (val: number) => void;
 }) {
   return (
     <>
@@ -214,182 +217,229 @@ function Drawer({
           </div>
         </div>
 
-        {/* new chat */}
-        <div style={{ padding: '12px 12px 4px' }}>
-          <button
-            onClick={() => { onNewChat(); onClose(); }}
-            style={{
-              width: '100%', background: 'rgba(42,171,238,0.12)', color: '#2AABEE',
-              border: '1px solid rgba(42,171,238,0.25)', borderRadius: 10,
-              padding: '10px 16px', fontWeight: 600, fontSize: 14, cursor: 'pointer',
-              fontFamily: 'inherit', display: 'flex', alignItems: 'center', gap: 8,
-              justifyContent: 'center', transition: 'background 0.2s',
-            }}
-          >
-            <IconPlus /> New Chat
-          </button>
-        </div>
+        {/* Scrollable body wrapper to prevent any elements from being squeezed */}
+        <div style={{ flex: 1, overflowY: 'auto', display: 'flex', flexDirection: 'column' }}>
+          {/* new chat */}
+          <div style={{ padding: '12px 12px 4px', flexShrink: 0 }}>
+            <button
+              onClick={() => { onNewChat(); onClose(); }}
+              style={{
+                width: '100%', background: 'rgba(42,171,238,0.12)', color: '#2AABEE',
+                border: '1px solid rgba(42,171,238,0.25)', borderRadius: 10,
+                padding: '10px 16px', fontWeight: 600, fontSize: 14, cursor: 'pointer',
+                fontFamily: 'inherit', display: 'flex', alignItems: 'center', gap: 8,
+                justifyContent: 'center', transition: 'background 0.2s',
+              }}
+            >
+              <IconPlus /> New Chat
+            </button>
+          </div>
 
-        <div className="divider" style={{ margin: '8px 0' }} />
+          <div className="divider" style={{ margin: '8px 0', flexShrink: 0 }} />
 
-        {/* chat list */}
-        <div style={{ flex: 1, overflowY: 'auto', padding: '4px 0' }}>
-          {chats.length === 0 && (
-            <p style={{ color: 'var(--text-secondary)', fontSize: 13, textAlign: 'center', marginTop: 24, padding: '0 16px' }}>
-              No chats yet
-            </p>
-          )}
-          {chats.map((chat) => {
-            const lastMsg = chat.messages.filter(m => !m.isStreaming).at(-1);
-            const isActive = chat.id === activeChatId;
-            const hasCustomPrompt = chat.systemPrompt !== DEFAULT_SYSTEM_PROMPT;
-            return (
-              <div
-                key={chat.id}
-                className={`chat-list-item${isActive ? ' active' : ''}`}
-                onClick={() => { onSelectChat(chat.id); onClose(); }}
-                style={{ cursor: 'pointer' }}
-              >
-                <div className="chat-list-avatar">
-                  {chat.title.charAt(0).toUpperCase()}
-                </div>
-                <div style={{ flex: 1, minWidth: 0, textAlign: 'left' }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                    <span style={{
-                      fontWeight: 600, fontSize: 14, color: 'var(--text-primary)',
+          {/* chat list */}
+          <div style={{ padding: '4px 0', flexShrink: 0 }}>
+            {chats.length === 0 && (
+              <p style={{ color: 'var(--text-secondary)', fontSize: 13, textAlign: 'center', marginTop: 24, padding: '0 16px' }}>
+                No chats yet
+              </p>
+            )}
+            {chats.map((chat) => {
+              const lastMsg = chat.messages.filter(m => !m.isStreaming).at(-1);
+              const isActive = chat.id === activeChatId;
+              const hasCustomPrompt = chat.systemPrompt !== DEFAULT_SYSTEM_PROMPT;
+              return (
+                <div
+                  key={chat.id}
+                  className={`chat-list-item${isActive ? ' active' : ''}`}
+                  onClick={() => { onSelectChat(chat.id); onClose(); }}
+                  style={{ cursor: 'pointer' }}
+                >
+                  <div className="chat-list-avatar">
+                    {chat.title.charAt(0).toUpperCase()}
+                  </div>
+                  <div style={{ flex: 1, minWidth: 0, textAlign: 'left' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                      <span style={{
+                        fontWeight: 600, fontSize: 14, color: 'var(--text-primary)',
+                        whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
+                      }}>
+                        {chat.title}
+                      </span>
+                      {hasCustomPrompt && (
+                        <span title="Custom system prompt" style={{
+                          fontSize: 10, background: 'rgba(42,171,238,0.15)',
+                          color: '#2AABEE', borderRadius: 4, padding: '1px 5px',
+                          flexShrink: 0, fontWeight: 600,
+                        }}>
+                          custom
+                        </span>
+                      )}
+                    </div>
+                    <div style={{
+                      fontSize: 12, color: 'var(--text-secondary)', marginTop: 2,
                       whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
                     }}>
-                      {chat.title}
-                    </span>
-                    {hasCustomPrompt && (
-                      <span title="Custom system prompt" style={{
-                        fontSize: 10, background: 'rgba(42,171,238,0.15)',
-                        color: '#2AABEE', borderRadius: 4, padding: '1px 5px',
-                        flexShrink: 0, fontWeight: 600,
-                      }}>
-                        custom
-                      </span>
-                    )}
-                  </div>
-                  <div style={{
-                    fontSize: 12, color: 'var(--text-secondary)', marginTop: 2,
-                    whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
-                  }}>
-                    {lastMsg ? lastMsg.text.slice(0, 48) : 'No messages'}
-                  </div>
-                </div>
-                <button
-                  onClick={(e) => { e.stopPropagation(); onDeleteChat(chat.id); }}
-                  style={{
-                    background: 'none', border: 'none', cursor: 'pointer',
-                    color: 'var(--text-secondary)', padding: 4, borderRadius: 6,
-                    opacity: 0.5, transition: 'opacity 0.2s',
-                  }}
-                  onMouseEnter={e => (e.currentTarget.style.opacity = '1')}
-                  onMouseLeave={e => (e.currentTarget.style.opacity = '0.5')}
-                  title="Delete chat"
-                >
-                  <IconTrash />
-                </button>
-              </div>
-            );
-          })}
-        </div>
-
-        <div className="divider" />
-
-        {/* Model selection */}
-        <div style={{ padding: '8px 16px' }}>
-          <div style={{
-            fontSize: 11, fontWeight: 700, letterSpacing: 0.5,
-            color: 'var(--text-secondary)', textTransform: 'uppercase', marginBottom: 8,
-          }}>
-            Language Model
-          </div>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-            {MODELS_LIST.map((m) => {
-              const isSelected = selectedModelUrl === m.url;
-              return (
-                <button
-                  key={m.id}
-                  onClick={() => onSelectModel(m.url)}
-                  style={{
-                    background: isSelected ? 'rgba(42,171,238,0.12)' : 'transparent',
-                    border: isSelected ? '1px solid rgba(42,171,238,0.3)' : '1px solid var(--divider)',
-                    color: isSelected ? '#2AABEE' : 'var(--text-primary)',
-                    borderRadius: 8, padding: '10px 12px', fontSize: 13,
-                    fontWeight: isSelected ? 600 : 500, textAlign: 'left',
-                    cursor: 'pointer', display: 'flex', flexDirection: 'column', gap: 4,
-                    fontFamily: 'inherit', transition: 'all 0.2s', width: '100%',
-                  }}
-                  onMouseEnter={e => {
-                    if (!isSelected) {
-                      e.currentTarget.style.borderColor = 'rgba(42,171,238,0.4)';
-                      e.currentTarget.style.background = 'rgba(42,171,238,0.03)';
-                    }
-                  }}
-                  onMouseLeave={e => {
-                    if (!isSelected) {
-                      e.currentTarget.style.borderColor = 'var(--divider)';
-                      e.currentTarget.style.background = 'transparent';
-                    }
-                  }}
-                >
-                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%' }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                      <div style={{
-                        width: 8, height: 8, borderRadius: '50%',
-                        background: isSelected ? '#2AABEE' : 'transparent',
-                        border: isSelected ? 'none' : '1px solid var(--text-secondary)',
-                      }} />
-                      <span style={{ fontWeight: 600 }}>{m.name}</span>
+                      {lastMsg ? lastMsg.text.slice(0, 48) : 'No messages'}
                     </div>
-                    {isSelected && (
-                      <span style={{ fontSize: 9, background: 'rgba(42,171,238,0.15)', color: '#2AABEE', borderRadius: 4, padding: '1px 5px', fontWeight: 600 }}>
-                        active
-                      </span>
-                    )}
                   </div>
-                  <div style={{ fontSize: 11, color: 'var(--text-secondary)', paddingLeft: 16, marginTop: 2 }}>
-                    {m.description}
-                  </div>
-                </button>
+                  <button
+                    onClick={(e) => { e.stopPropagation(); onDeleteChat(chat.id); }}
+                    style={{
+                      background: 'none', border: 'none', cursor: 'pointer',
+                      color: 'var(--text-secondary)', padding: 4, borderRadius: 6,
+                      opacity: 0.5, transition: 'opacity 0.2s',
+                    }}
+                    onMouseEnter={e => (e.currentTarget.style.opacity = '1')}
+                    onMouseLeave={e => (e.currentTarget.style.opacity = '0.5')}
+                    title="Delete chat"
+                  >
+                    <IconTrash />
+                  </button>
+                </div>
               );
             })}
           </div>
-          <button
-            onClick={() => {
-              if (confirm('Clear local cache for all models?')) {
-                onClearCache();
-                onClose();
-              }
-            }}
-            style={{
-              background: 'none', border: 'none', cursor: 'pointer',
-              color: 'var(--text-secondary)', fontSize: 11,
-              marginTop: 8, display: 'block', fontFamily: 'inherit',
-              textDecoration: 'underline', opacity: 0.7, padding: 0,
-            }}
-          >
-            Clear downloaded files
-          </button>
-        </div>
 
-        <div className="divider" />
+          <div className="divider" style={{ flexShrink: 0 }} />
 
-        {/* theme toggle */}
-        <div style={{
-          padding: '12px 16px', display: 'flex', alignItems: 'center',
-          gap: 10, color: 'var(--text-primary)',
-        }}>
-          <span style={{ color: 'var(--text-secondary)' }}>
-            {isDark ? <IconMoon /> : <IconSun />}
-          </span>
-          <span style={{ flex: 1, fontSize: 14 }}>{isDark ? 'Dark theme' : 'Light theme'}</span>
-          <label className="theme-switch">
-            <input type="checkbox" checked={isDark} onChange={onToggleTheme} />
-            <span className="theme-switch-slider" />
-          </label>
+          {/* Model selection */}
+          <div style={{ padding: '8px 16px', flexShrink: 0 }}>
+            <div style={{
+              fontSize: 11, fontWeight: 700, letterSpacing: 0.5,
+              color: 'var(--text-secondary)', textTransform: 'uppercase', marginBottom: 8,
+            }}>
+              Language Model
+            </div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+              {MODELS_LIST.map((m) => {
+                const isSelected = selectedModelUrl === m.url;
+                return (
+                  <button
+                    key={m.id}
+                    onClick={() => onSelectModel(m.url)}
+                    style={{
+                      background: isSelected ? 'rgba(42,171,238,0.12)' : 'transparent',
+                      border: isSelected ? '1px solid rgba(42,171,238,0.3)' : '1px solid var(--divider)',
+                      color: isSelected ? '#2AABEE' : 'var(--text-primary)',
+                      borderRadius: 8, padding: '10px 12px', fontSize: 13,
+                      fontWeight: isSelected ? 600 : 500, textAlign: 'left',
+                      cursor: 'pointer', display: 'flex', flexDirection: 'column', gap: 4,
+                      fontFamily: 'inherit', transition: 'all 0.2s', width: '100%',
+                    }}
+                    onMouseEnter={e => {
+                      if (!isSelected) {
+                        e.currentTarget.style.borderColor = 'rgba(42,171,238,0.4)';
+                        e.currentTarget.style.background = 'rgba(42,171,238,0.03)';
+                      }
+                    }}
+                    onMouseLeave={e => {
+                      if (!isSelected) {
+                        e.currentTarget.style.borderColor = 'var(--divider)';
+                        e.currentTarget.style.background = 'transparent';
+                      }
+                    }}
+                  >
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                        <div style={{
+                          width: 8, height: 8, borderRadius: '50%',
+                          background: isSelected ? '#2AABEE' : 'transparent',
+                          border: isSelected ? 'none' : '1px solid var(--text-secondary)',
+                        }} />
+                        <span style={{ fontWeight: 600 }}>{m.name}</span>
+                      </div>
+                      {isSelected && (
+                        <span style={{ fontSize: 9, background: 'rgba(42,171,238,0.15)', color: '#2AABEE', borderRadius: 4, padding: '1px 5px', fontWeight: 600 }}>
+                          active
+                        </span>
+                      )}
+                    </div>
+                    <div style={{ fontSize: 11, color: 'var(--text-secondary)', paddingLeft: 16, marginTop: 2 }}>
+                      {m.description}
+                    </div>
+                  </button>
+                );
+              })}
+            </div>
+            <button
+              onClick={() => {
+                if (confirm('Clear local cache for all models?')) {
+                  onClearCache();
+                  onClose();
+                }
+              }}
+              style={{
+                background: 'none', border: 'none', cursor: 'pointer',
+                color: 'var(--text-secondary)', fontSize: 11,
+                marginTop: 8, display: 'block', fontFamily: 'inherit',
+                textDecoration: 'underline', opacity: 0.7, padding: 0,
+              }}
+            >
+              Clear downloaded files
+            </button>
+          </div>
+
+          <div className="divider" style={{ flexShrink: 0 }} />
+
+          {/* Context Memory Setting */}
+          <div style={{ padding: '8px 16px', flexShrink: 0 }}>
+            <div style={{
+              fontSize: 11, fontWeight: 700, letterSpacing: 0.5,
+              color: 'var(--text-secondary)', textTransform: 'uppercase', marginBottom: 8,
+            }}>
+              Context Memory
+            </div>
+            <div style={{
+              background: 'var(--card-bg, rgba(255,255,255,0.03))',
+              border: '1px solid var(--divider)',
+              borderRadius: 10,
+              padding: 12, display: 'flex', flexDirection: 'column', gap: 8
+            }}>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                <span style={{ fontSize: 13, color: 'var(--text-primary)', fontWeight: 500 }}>
+                  Memory depth
+                </span>
+                <span style={{
+                  fontSize: 12, background: 'rgba(42,171,238,0.15)',
+                  color: '#2AABEE', padding: '2px 8px', borderRadius: 6, fontWeight: 600,
+                }}>
+                  {contextDepth === 0 ? 'Disabled' : `${contextDepth} turns`}
+                </span>
+              </div>
+              <input
+                type="range" min="0" max="10" value={contextDepth}
+                onChange={e => onContextDepthChange(parseInt(e.target.value, 10))}
+                style={{
+                  width: '100%', accentColor: '#2AABEE', cursor: 'pointer',
+                  background: 'var(--divider)', height: 4, borderRadius: 2, outline: 'none',
+                  margin: '8px 0'
+                }}
+              />
+              <div style={{ fontSize: 11, color: 'var(--text-secondary)', lineHeight: 1.3 }}>
+                {contextDepth === 0
+                  ? 'Model will only see the current message (saves RAM/speed)'
+                  : `Model remembers the last ${contextDepth * 2} messages for a coherent dialogue.`}
+              </div>
+            </div>
+          </div>
+
+          <div className="divider" style={{ flexShrink: 0 }} />
+
+          {/* theme toggle */}
+          <div style={{
+            padding: '12px 16px', display: 'flex', alignItems: 'center',
+            gap: 10, color: 'var(--text-primary)', flexShrink: 0,
+          }}>
+            <span style={{ color: 'var(--text-secondary)' }}>
+              {isDark ? <IconMoon /> : <IconSun />}
+            </span>
+            <span style={{ flex: 1, fontSize: 14 }}>{isDark ? 'Dark theme' : 'Light theme'}</span>
+            <label className="theme-switch">
+              <input type="checkbox" checked={isDark} onChange={onToggleTheme} />
+              <span className="theme-switch-slider" />
+            </label>
+          </div>
         </div>
       </div>
     </>
@@ -421,6 +471,16 @@ export default function ChatInterface({
     const saved = loadChats();
     return saved.length > 0 ? saved[0].id : '';
   });
+
+  const [contextDepth, setContextDepth] = useState<number>(() => {
+    const saved = localStorage.getItem('gemma_context_depth');
+    return saved ? parseInt(saved, 10) : 5;
+  });
+
+  const handleContextDepthChange = useCallback((val: number) => {
+    setContextDepth(val);
+    localStorage.setItem('gemma_context_depth', val.toString());
+  }, []);
 
   /* ── ui state ── */
   const [userText, setUserText] = useState('');
@@ -601,8 +661,11 @@ export default function ChatInterface({
     updatePendingImage(null);
     setPendingAudio(null);
 
-    // Map current chat messages to simple role/text history to pass context memory
-    const history = activeChat?.messages.map(m => ({ role: m.role, text: m.text })) || [];
+    // Map current chat messages to simple role/text history, sliced by contextDepth * 2
+    const sliceCount = contextDepth * 2;
+    const history = sliceCount > 0
+      ? (activeChat?.messages.slice(-sliceCount).map(m => ({ role: m.role, text: m.text })) || [])
+      : [];
 
     // Pass this chat's systemPrompt, image base64, resampled audio PCM, and history to the model
     onSendPrompt(finalText, pendingImage?.base64, audioPCM, activeChat?.systemPrompt, history);
@@ -636,6 +699,8 @@ export default function ChatInterface({
           selectedModelUrl={selectedModelUrl}
           onSelectModel={onSelectModel}
           onClearCache={onClearCache}
+          contextDepth={contextDepth}
+          onContextDepthChange={handleContextDepthChange}
         />
       )}
 

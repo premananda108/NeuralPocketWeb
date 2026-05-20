@@ -357,9 +357,9 @@ async function handlePrompt(
     if (hasMultimodal) {
       const promptParts: any[] = [`<start_of_turn>user\n${sysPrompt}\n\n`]
 
-      // Add context history (up to last 10 messages = 5 exchanges)
+      // Add context history (up to last 20 messages = 10 exchanges)
       if (history && history.length > 0) {
-        const recentHistory = history.slice(-10)
+        const recentHistory = history.slice(-20)
         recentHistory.forEach(msg => {
           if (msg.role === 'user') {
             promptParts.push(`${msg.text}\n<end_of_turn>\n`)
@@ -397,7 +397,7 @@ async function handlePrompt(
       let promptText = `<start_of_turn>user\n${sysPrompt}\n\n`
 
       if (history && history.length > 0) {
-        const recentHistory = history.slice(-10)
+        const recentHistory = history.slice(-20)
         recentHistory.forEach(msg => {
           if (msg.role === 'user') {
             promptText += `${msg.text}\n<end_of_turn>\n`
