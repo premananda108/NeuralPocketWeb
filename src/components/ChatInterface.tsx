@@ -361,6 +361,38 @@ function Drawer({
                   </button>
                 );
               })}
+
+              {/* Custom Model Card if selected URL is not in standard list */}
+              {!MODELS_LIST.some(m => m.url === selectedModelUrl) && (
+                <div style={{
+                  background: 'rgba(42,171,238,0.12)',
+                  border: '1px solid rgba(42,171,238,0.3)',
+                  color: '#2AABEE',
+                  borderRadius: 8, padding: '10px 12px', fontSize: 13,
+                  fontWeight: 600, textAlign: 'left',
+                  display: 'flex', flexDirection: 'column', gap: 4,
+                  width: '100%',
+                }}>
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                      <div style={{
+                        width: 8, height: 8, borderRadius: '50%',
+                        background: '#2AABEE',
+                      }} />
+                      <span style={{ fontWeight: 600 }}>Custom Model</span>
+                    </div>
+                    <span style={{ fontSize: 9, background: 'rgba(42,171,238,0.15)', color: '#2AABEE', borderRadius: 4, padding: '1px 5px', fontWeight: 600 }}>
+                      active
+                    </span>
+                  </div>
+                  <div style={{
+                    fontSize: 11, color: 'var(--text-secondary)', paddingLeft: 16, marginTop: 2,
+                    whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis'
+                  }} title={selectedModelUrl}>
+                    {selectedModelUrl}
+                  </div>
+                </div>
+              )}
             </div>
             <button
               onClick={() => {

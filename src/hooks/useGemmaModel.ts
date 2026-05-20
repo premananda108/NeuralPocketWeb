@@ -190,6 +190,10 @@ export function useGemmaModel(): UseGemmaModelReturn {
         return;
       }
       setError(null);
+      if (modelUrl !== selectedModelUrl) {
+        setSelectedModelUrlState(modelUrl);
+        localStorage.setItem(SELECTED_MODEL_KEY, modelUrl);
+      }
       workerRef.current?.postMessage({ type: 'INIT', modelUrl });
     },
     [status, selectedModelUrl]
