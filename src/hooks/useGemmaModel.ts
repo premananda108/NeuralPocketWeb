@@ -62,7 +62,7 @@ export interface UseGemmaModelReturn {
   selectModel: (url: string) => void;
   initModel: (modelUrl?: string) => void;
   /** systemPrompt is now passed per-call, not stored globally */
-  sendPrompt: (text: string, imageBase64?: string, systemPrompt?: string) => void;
+  sendPrompt: (text: string, imageBase64?: string, audioRaw?: Float32Array, systemPrompt?: string) => void;
   abortGeneration: () => void;
   resetChat: () => void;
   clearModelCache: (modelUrl?: string) => void;
