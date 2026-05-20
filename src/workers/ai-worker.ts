@@ -78,16 +78,28 @@ function getCacheFilename(modelUrl: string): string {
 }
 
 async function getModelFromOPFS(cacheFilename: string): Promise<File | null> {
-  try {
-    const root = await navigator.storage.getDirectory()
-    const fileHandle = await root.getFileHandle(cacheFilename)
-    const file = await fileHandle.getFile()
-    if (file.size > 100_000) {
-      console.log(`[AI Worker] Found cached model: ${cacheFilename} (${(file.size / 1024 / 1024).toFixed(1)} MB)`)
-      return file
+  let retries = 3
+  while (retries > 0) {
+    try {
+      const root = await navigator.storage.getDirectory()
+      const fileHandle = await root.getFileHandle(cacheFilename)
+      const file = await fileHandle.getFile()
+      if (file.size > 100_000) {
+        console.log(`[AI Worker] Found cached model: ${cacheFilename} (${(file.size / 1024 / 1024).toFixed(1)} MB)`)
+        return file
+      }
+      return null
+    } catch (err: any) {
+      console.warn(`[AI Worker] getModelFromOPFS failed (attempts left: ${retries - 1}):`, err)
+      if (err?.name === 'InvalidStateError' || err?.message?.includes('state cached')) {
+        retries--
+        if (retries > 0) {
+          await new Promise(resolve => setTimeout(resolve, 500))
+          continue
+        }
+      }
+      break
     }
-  } catch {
-    // not found
   }
   return null
 }
@@ -106,9 +118,33 @@ async function downloadAndCacheModel(modelUrl: string, cacheFilename: string): P
   const contentLength = parseInt(response.headers.get('Content-Length') || '0')
   const totalMB = contentLength > 0 ? contentLength / 1_048_576 : 0
 
-  const root = await navigator.storage.getDirectory()
-  const fileHandle = await root.getFileHandle(cacheFilename, { create: true })
-  const writable = await fileHandle.createWritable()
+  let fileHandle
+  let writable
+  let retries = 3
+  
+  while (retries > 0) {
+    try {
+      const root = await navigator.storage.getDirectory()
+      // 1. Ensure the file is created first
+      await root.getFileHandle(cacheFilename, { create: true })
+      // 2. Fetch a completely fresh file handle to ensure the browser's cache is fully updated
+      fileHandle = await root.getFileHandle(cacheFilename)
+      // 3. Obtain the writable stream from the fresh handle
+      writable = await fileHandle.createWritable()
+      break
+    } catch (err: any) {
+      console.warn(`[AI Worker] Failed to acquire writable stream (attempts left: ${retries - 1}):`, err)
+      if (err?.name === 'InvalidStateError' || err?.message?.includes('state cached')) {
+        retries--
+        if (retries > 0) {
+          await new Promise(resolve => setTimeout(resolve, 500))
+          continue
+        }
+      }
+      throw err
+    }
+  }
+
   const reader = response.body!.getReader()
   let receivedBytes = 0
   let lastReport = 0
@@ -134,11 +170,16 @@ async function downloadAndCacheModel(modelUrl: string, cacheFilename: string): P
     console.log(`[AI Worker] Download complete: ${cacheFilename} (${(receivedBytes / 1_048_576).toFixed(1)} MB)`)
   } catch (error) {
     await writable.abort()
-    try { await (await navigator.storage.getDirectory()).removeEntry(cacheFilename) } catch { /* ignore */ }
+    try {
+      const root = await navigator.storage.getDirectory()
+      await root.removeEntry(cacheFilename)
+    } catch { /* ignore */ }
     throw error
   }
 
-  return await fileHandle.getFile()
+  const root = await navigator.storage.getDirectory()
+  const freshFileHandle = await root.getFileHandle(cacheFilename)
+  return await freshFileHandle.getFile()
 }
 
 async function clearCache(modelUrl?: string) {
