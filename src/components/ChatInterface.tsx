@@ -574,17 +574,20 @@ export default function ChatInterface({
   useEffect(() => {
     // Only commit the final text to the persistent state when generation completes
     if (!isGenerating && streamingId && streamingChatId && streamingText) {
-      setAllChats(prev => prev.map(chat => {
-        if (chat.id !== streamingChatId) return chat;
-        return {
-          ...chat,
-          messages: chat.messages.map(msg =>
-            msg.id === streamingId
-              ? { ...msg, text: streamingText, isStreaming: false }
-              : msg
-          ),
-        };
-      }));
+      const timer = setTimeout(() => {
+        setAllChats(prev => prev.map(chat => {
+          if (chat.id !== streamingChatId) return chat;
+          return {
+            ...chat,
+            messages: chat.messages.map(msg =>
+              msg.id === streamingId
+                ? { ...msg, text: streamingText, isStreaming: false }
+                : msg
+            ),
+          };
+        }));
+      }, 0);
+      return () => clearTimeout(timer);
     }
   // We explicitly want this to run only when generation stops to commit the final text
   // eslint-disable-next-line react-hooks/exhaustive-deps
