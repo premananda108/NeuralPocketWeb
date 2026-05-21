@@ -4,10 +4,10 @@ import ModelDownloader from './components/ModelDownloader';
 import ChatInterface from './components/ChatInterface';
 import { useGemmaModel } from './hooks/useGemmaModel';
 
-type AppState = 'onboarding' | 'loading' | 'chat';
-
 export default function App() {
-  const [appState, setAppState] = useState<AppState>('onboarding');
+  const [hasSeenOnboarding, setHasSeenOnboarding] = useState<boolean>(
+    () => localStorage.getItem('hasSeenOnboarding') === 'true'
+  );
   const [isDark, setIsDark] = useState<boolean>(() => {
     const saved = localStorage.getItem('theme');
     return saved ? saved === 'dark' : true;
@@ -33,33 +33,24 @@ export default function App() {
     localStorage.setItem('theme', isDark ? 'dark' : 'light');
   }, [isDark]);
 
-  useEffect(() => {
-    const hasSeenOnboarding = localStorage.getItem('hasSeenOnboarding');
-    if (hasSeenOnboarding && appState === 'onboarding') {
-      setAppState('loading');
-    }
-  }, [appState]);
-
   const handleStart = () => {
     localStorage.setItem('hasSeenOnboarding', 'true');
-    setAppState('loading');
+    setHasSeenOnboarding(true);
   };
 
-  useEffect(() => {
-    if (status === 'ready' && appState === 'loading') {
-      setAppState('chat');
-    } else if (status !== 'ready' && appState === 'chat') {
-      setAppState('loading');
-    }
-  }, [status, appState]);
+  const currentScreen = !hasSeenOnboarding
+    ? 'onboarding'
+    : status === 'ready'
+      ? 'chat'
+      : 'loading';
 
   return (
     <div style={{ minHeight: '100dvh', background: 'var(--bg)', color: 'var(--text-primary)' }}>
-      {appState === 'onboarding' && (
+      {currentScreen === 'onboarding' && (
         <OnboardingScreen onContinue={handleStart} />
       )}
 
-      {appState === 'loading' && (
+      {currentScreen === 'loading' && (
         <ModelDownloader
           status={status}
           progress={progress}
@@ -72,7 +63,7 @@ export default function App() {
         />
       )}
 
-      {appState === 'chat' && (
+      {currentScreen === 'chat' && (
         <ChatInterface
           streamingText={streamingText}
           isGenerating={isGenerating}
