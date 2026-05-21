@@ -549,7 +549,18 @@ export default function ChatInterface({
   const [draftPrompt, setDraftPrompt] = useState('');
 
   /* ── derived ── */
-  const activeChat = allChats.find(c => c.id === activeChatId) ?? allChats[0];
+  const activeChatBase = allChats.find(c => c.id === activeChatId) ?? allChats[0];
+  
+  // Dynamically merge streaming text into the active chat during render.
+  // This entirely eliminates cascading renders and excessive localStorage writes!
+  const activeChat = {
+    ...activeChatBase,
+    messages: activeChatBase.messages.map(msg => 
+      (msg.id === streamingId && activeChatBase.id === streamingChatId)
+        ? { ...msg, text: streamingText || msg.text, isStreaming: isGenerating }
+        : msg
+    )
+  };
 
   /* ── persist ── */
   useEffect(() => { saveChats(allChats); }, [allChats]);
@@ -557,23 +568,27 @@ export default function ChatInterface({
   /* ── auto-scroll ── */
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-  }, [activeChat?.messages, streamingText]);
+  }, [activeChat.messages]);
 
   /* ── stream → source chat ── */
   useEffect(() => {
-    if (!streamingId || !streamingChatId) return;
-    setAllChats(prev => prev.map(chat => {
-      if (chat.id !== streamingChatId) return chat;
-      return {
-        ...chat,
-        messages: chat.messages.map(msg =>
-          msg.id === streamingId
-            ? { ...msg, text: streamingText, isStreaming: isGenerating }
-            : msg
-        ),
-      };
-    }));
-  }, [streamingText, isGenerating, streamingId, streamingChatId]);
+    // Only commit the final text to the persistent state when generation completes
+    if (!isGenerating && streamingId && streamingChatId && streamingText) {
+      setAllChats(prev => prev.map(chat => {
+        if (chat.id !== streamingChatId) return chat;
+        return {
+          ...chat,
+          messages: chat.messages.map(msg =>
+            msg.id === streamingId
+              ? { ...msg, text: streamingText, isStreaming: false }
+              : msg
+          ),
+        };
+      }));
+    }
+  // We explicitly want this to run only when generation stops to commit the final text
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isGenerating]);
 
   /* ── auto-resize textarea ── */
   useEffect(() => {
@@ -668,9 +683,10 @@ export default function ChatInterface({
       try {
         // Decode the selected audio file directly on the main thread
         audioPCM = await decodeAudioFile(pendingAudio.file);
-      } catch (err: any) {
-        console.error('Audio decoding error:', err);
-        alert(`Failed to decode audio file: ${err?.message ?? String(err)}`);
+      } catch (err) {
+        const error = err as Error;
+        console.error('Audio decoding error:', error);
+        alert(`Failed to decode audio file: ${error?.message ?? String(error)}`);
         return;
       }
     }
