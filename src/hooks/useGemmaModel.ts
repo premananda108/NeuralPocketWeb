@@ -71,7 +71,7 @@ const SELECTED_MODEL_KEY = 'gemma_selected_model_url';
  */
 export async function decodeAudioFile(fileOrBlob: Blob): Promise<Float32Array> {
   const arrayBuffer = await fileOrBlob.arrayBuffer();
-  const AudioContextClass = window.AudioContext || (window as any).webkitAudioContext;
+  const AudioContextClass = window.AudioContext || (window as Window & { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
   if (!AudioContextClass) {
     throw new Error('AudioContext is not supported in this browser.');
   }

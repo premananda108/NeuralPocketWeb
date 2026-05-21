@@ -6,7 +6,9 @@ import type { LlmInference } from '@mediapipe/tasks-genai'
 import { DEFAULT_SYSTEM_PROMPT } from '../constants'
 import { getCacheFilename } from '../utils/chatHelpers'
 
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
 let FilesetResolver: any = null
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
 let LlmInferenceClass: any = null
 
 let llmInstance: LlmInference | null = null
@@ -16,8 +18,8 @@ let isGenerating = false
 let activeBlobUrl: string | null = null
 
 // Fix for MediaPipe dynamic import in Module Workers
-if (typeof (self as any).import === 'undefined') {
-  (self as any).import = async (path: string) => {
+if (typeof (self as unknown as Record<string, unknown>).import === 'undefined') {
+  (self as unknown as Record<string, unknown>).import = async (path: string) => {
     console.log(`[AI Worker] Polyfilling self.import: fetching and evaluating ${path}`);
     const url = path.startsWith('http') ? path : new URL(path, self.location.origin).href;
     const response = await fetch(url);
@@ -31,17 +33,17 @@ if (typeof (self as any).import === 'undefined') {
 }
 
 // Fix for MediaPipe ReferenceErrors in Web Workers (HTML DOM elements are missing in background threads)
-if (typeof (self as any).HTMLImageElement === 'undefined') {
-  (self as any).HTMLImageElement = class {};
+if (typeof (self as unknown as Record<string, unknown>).HTMLImageElement === 'undefined') {
+  (self as unknown as Record<string, unknown>).HTMLImageElement = class {};
 }
-if (typeof (self as any).HTMLVideoElement === 'undefined') {
-  (self as any).HTMLVideoElement = class {};
+if (typeof (self as unknown as Record<string, unknown>).HTMLVideoElement === 'undefined') {
+  (self as unknown as Record<string, unknown>).HTMLVideoElement = class {};
 }
-if (typeof (self as any).VideoFrame === 'undefined') {
-  (self as any).VideoFrame = class {};
+if (typeof (self as unknown as Record<string, unknown>).VideoFrame === 'undefined') {
+  (self as unknown as Record<string, unknown>).VideoFrame = class {};
 }
-if (typeof (self as any).AudioContext === 'undefined') {
-  (self as any).AudioContext = class {};
+if (typeof (self as unknown as Record<string, unknown>).AudioContext === 'undefined') {
+  (self as unknown as Record<string, unknown>).AudioContext = class {};
 }
 
 // ─── Message handler ───────────────────────────────────────────────────────
@@ -81,9 +83,10 @@ async function getModelFromOPFS(cacheFilename: string): Promise<File | null> {
         return file
       }
       return null
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.warn(`[AI Worker] getModelFromOPFS failed (attempts left: ${retries - 1}):`, err)
-      if (err?.name === 'InvalidStateError' || err?.message?.includes('state cached')) {
+      const errObj = err as { name?: string; message?: string };
+      if (errObj?.name === 'InvalidStateError' || errObj?.message?.includes('state cached')) {
         retries--
         if (retries > 0) {
           await new Promise(resolve => setTimeout(resolve, 500))
@@ -115,13 +118,15 @@ async function downloadAndCacheModel(modelUrl: string, cacheFilename: string): P
   const fileHandle = await root.getFileHandle(cacheFilename, { create: true })
 
   // Open high-performance sync access handle
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   let accessHandle: any
   let retries = 3
   while (retries > 0) {
     try {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       accessHandle = await (fileHandle as any).createSyncAccessHandle()
       break
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.warn(`[AI Worker] Failed to acquire sync access handle (attempts left: ${retries - 1}):`, err)
       retries--
       if (retries > 0) {
@@ -185,7 +190,7 @@ async function clearCache(modelUrl?: string) {
       await root.removeEntry(getCacheFilename(modelUrl))
     } else {
       const knownExtensions = ['.task', '.litertlm', '.bin']
-      // @ts-ignore - values() is available on OPFS directory handles
+      // @ts-expect-error - values() is available on OPFS directory handles
       for await (const entry of root.values()) {
         if (entry.kind === 'file') {
           const isModelFile = knownExtensions.some(ext => entry.name.toLowerCase().endsWith(ext))
@@ -253,7 +258,7 @@ async function handleInit(modelUrl: string) {
         '3. Relaunch Chrome'
       )
     }
-    console.log('[AI Worker] WebGPU OK:', (adapter as any).info?.vendor ?? 'unknown')
+    console.log('[AI Worker] WebGPU OK:', (adapter as unknown as { info?: { vendor?: string } }).info?.vendor ?? 'unknown')
 
     if (!adapter.features.has('shader-f16')) {
       console.warn("[AI Worker] WebGPU feature 'shader-f16' is not supported by this GPU/driver. MediaPipe will fall back to FP32 computations.");
@@ -281,7 +286,7 @@ async function handleInit(modelUrl: string) {
 
     // Revoke previous blob URL if it exists
     if (activeBlobUrl) {
-      try { URL.revokeObjectURL(activeBlobUrl) } catch {}
+      try { URL.revokeObjectURL(activeBlobUrl) } catch { /* ignore */ }
     }
     activeBlobUrl = blobUrl // Keep active to prevent net::ERR_FILE_NOT_FOUND in subsequent reads
 
@@ -289,11 +294,11 @@ async function handleInit(modelUrl: string) {
     isInitializing = false
     self.postMessage({ type: 'INIT_DONE' })
 
-  } catch (error: any) {
+  } catch (error: unknown) {
     isInitializing = false
     console.error('[AI Worker] Init error:', error)
     
-    let userFriendlyError = error?.message ?? String(error)
+    let userFriendlyError = (error as Error)?.message ?? String(error)
     if (
       userFriendlyError.includes('Audio options should not be null') ||
       userFriendlyError.includes('Audio input not supported') ||
@@ -342,7 +347,7 @@ async function handlePrompt(
 
   const sysPrompt = systemPrompt?.trim() || DEFAULT_SYSTEM_PROMPT
   let imageBitmap: ImageBitmap | null = null
-  let prompt: string | any[] = ''
+  let prompt: string | unknown[];
 
   try {
     let hasMultimodal = false
@@ -351,7 +356,7 @@ async function handlePrompt(
     }
 
     if (hasMultimodal) {
-      const promptParts: any[] = []
+      const promptParts: unknown[] = []
 
       // If history is present, format history turns with system prompt in the first user turn
       if (history && history.length > 0) {
@@ -441,6 +446,7 @@ async function handlePrompt(
   const HEADER_SUFFIX = '<start_of_turn>model\n'
 
   try {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     await (llmInstance as any).generateResponse(prompt, (partial: string, done: boolean) => {
       if (!isGenerating) return
 
@@ -473,7 +479,7 @@ async function handlePrompt(
         self.postMessage({ type: 'DONE' })
       }
     })
-  } catch (error: any) {
+  } catch (error: unknown) {
     if (imageBitmap) {
       try { imageBitmap.close() } catch { /* ignore */ }
       imageBitmap = null
@@ -481,7 +487,7 @@ async function handlePrompt(
     isGenerating = false
     console.error('[AI Worker] Prompt error:', error)
     
-    let userFriendlyError = error?.message ?? String(error)
+    let userFriendlyError = (error as Error)?.message ?? String(error)
     if (
       userFriendlyError.includes('Audio options should not be null') ||
       userFriendlyError.includes('Audio input not supported') ||
