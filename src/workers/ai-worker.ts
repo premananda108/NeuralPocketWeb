@@ -190,7 +190,6 @@ async function clearCache(modelUrl?: string) {
       await root.removeEntry(getCacheFilename(modelUrl))
     } else {
       const knownExtensions = ['.task', '.litertlm', '.bin']
-      // @ts-expect-error - values() is available on OPFS directory handles
       for await (const entry of root.values()) {
         if (entry.kind === 'file') {
           const isModelFile = knownExtensions.some(ext => entry.name.toLowerCase().endsWith(ext))
