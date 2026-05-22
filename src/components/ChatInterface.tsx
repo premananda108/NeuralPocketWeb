@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect, useCallback } from 'react';
+import { useState, useRef, useEffect, useLayoutEffect, useCallback } from 'react';
 import { DEFAULT_SYSTEM_PROMPT } from '../constants';
 import { MODELS_LIST, decodeAudioFile } from '../hooks/useGemmaModel';
 import { getHistoryTurns } from '../utils/chatHelpers';
@@ -491,6 +491,8 @@ export default function ChatInterface({
   const fileInputRef = useRef<HTMLInputElement>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+  // Always-fresh ref for streamingText so handleAbort doesn't need it as a dep
+  const streamingTextRef = useRef(streamingText);
 
   /* ── chats state ── */
   const [allChats, setAllChats] = useState<Chat[]>(() => {
@@ -547,6 +549,14 @@ export default function ChatInterface({
   const [streamingChatId, setStreamingChatId] = useState<string | null>(null);
   const [showSysPrompt, setShowSysPrompt] = useState(false);
   const [draftPrompt, setDraftPrompt] = useState('');
+
+  /* ── keep streamingTextRef in sync with the latest prop ──
+     useLayoutEffect fires synchronously after every render, before the browser
+     paints, so by the time any user event (e.g. clicking Stop) can fire,
+     streamingTextRef.current is guaranteed to hold the latest streamingText. */
+  useLayoutEffect(() => {
+    streamingTextRef.current = streamingText;
+  });
 
   /* ── derived ── */
   const activeChatBase = allChats.find(c => c.id === activeChatId) ?? allChats[0];
@@ -619,11 +629,14 @@ export default function ChatInterface({
    * - If partial text exists → keep it and mark the message as done.
    * - If no text yet → remove the empty AI bubble from the chat.
    * Clears streamingId/streamingChatId so the commit-effect is skipped (no double-write).
+   *
+   * Uses streamingTextRef (not streamingText prop) so this callback is NOT
+   * recreated on every streaming chunk — only when streamingId/streamingChatId change.
    */
   const handleAbort = useCallback(() => {
     onAbort(); // sends ABORT to worker + sets isGenerating=false in the hook
     if (streamingId && streamingChatId) {
-      const capturedText = streamingText; // capture before state changes
+      const capturedText = streamingTextRef.current; // always fresh, no dep needed
       setAllChats(prev => prev.map(chat => {
         if (chat.id !== streamingChatId) return chat;
         return {
@@ -642,7 +655,7 @@ export default function ChatInterface({
       setStreamingId(null);
       setStreamingChatId(null);
     }
-  }, [onAbort, streamingId, streamingChatId, streamingText]);
+  }, [onAbort, streamingId, streamingChatId]); // ← streamingText removed from deps
 
   const handleNewChat = useCallback(() => {
     if (isGenerating) handleAbort();
