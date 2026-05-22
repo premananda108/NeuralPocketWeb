@@ -4,6 +4,8 @@
 
 Built with **React**, **TypeScript**, **Vite**, and **MediaPipe Tasks GenAI**, the app provides a clean chat experience with support for **text**, **images**, and **audio inputs** while keeping inference local whenever the selected model and browser environment support it.
 
+![NeuralPocket Onboarding and Installation](src/assets/install.png)
+
 ## Highlights
 
 - **On-device AI inference** powered by Gemma-compatible models
@@ -42,11 +44,17 @@ NeuralPocket is designed to feel like a compact personal AI app:
 ### 1. Local-first AI chat
 The main chat interface supports conversational interaction with a Gemma-compatible LLM running in the browser.
 
+![Text Chat Demo](src/assets/web1text.gif)
+
 ### 2. Image input
 Users can attach an image and ask the model to describe, analyze, or extract information from it.
 
+![Image Input Demo](src/assets/web2image.gif)
+
 ### 3. Audio input
 Users can upload an audio file, which is decoded in the browser and sent to the model as 16 kHz mono PCM for speech understanding or transcription-style tasks.
+
+![Audio Input Demo](src/assets/web3audio.gif)
 
 ### 4. Model selection
 The app includes a model picker with predefined options and also allows loading a **custom compatible model URL**.
