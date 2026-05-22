@@ -91,22 +91,76 @@ self.onmessage = async (event: MessageEvent) => {
 
 // ─── OPFS cache helpers ────────────────────────────────────────────────────
 
+// Sidecar file written next to every cached model.
+// Stores the byte counts we know at download time so we can detect truncated
+// or corrupted files without relying on magic-number heuristics.
+interface ModelMeta {
+  url: string
+  downloadedSize: number       // exact bytes written to OPFS
+  expectedSize: number | null  // Content-Length from server (null if not sent)
+  savedAt: number              // Date.now() when download finished
+}
 
 async function getModelFromOPFS(cacheFilename: string): Promise<File | null> {
+  const metaFilename = cacheFilename + '.meta'
   let retries = 3
   while (retries > 0) {
     try {
       const root = await navigator.storage.getDirectory()
-      const fileHandle = await root.getFileHandle(cacheFilename)
-      const file = await fileHandle.getFile()
-      if (file.size > 100_000) {
-        console.log(`[AI Worker] Found cached model: ${cacheFilename} (${(file.size / 1024 / 1024).toFixed(1)} MB)`)
-        return file
+
+      // ── 1. Read the model file ──────────────────────────────────────────
+      let modelFile: File
+      try {
+        const fileHandle = await root.getFileHandle(cacheFilename)
+        modelFile = await fileHandle.getFile()
+      } catch {
+        return null // not cached yet → trigger download
       }
-      return null
+
+      // ── 2. Read the sidecar meta ────────────────────────────────────────
+      let meta: ModelMeta | null = null
+      try {
+        const metaHandle = await root.getFileHandle(metaFilename)
+        meta = JSON.parse(await (await metaHandle.getFile()).text()) as ModelMeta
+      } catch {
+        // No meta → leftover from old code or broken write; treat as untrusted
+        console.warn(`[AI Worker] No meta for "${cacheFilename}", discarding cached model.`)
+        try { await root.removeEntry(cacheFilename) } catch { /* ignore */ }
+        return null
+      }
+
+      // ── 3. Validate: disk size matches what we actually wrote ───────────
+      if (modelFile.size !== meta.downloadedSize) {
+        console.warn(
+          `[AI Worker] Size mismatch — disk: ${modelFile.size} B, ` +
+          `meta.downloadedSize: ${meta.downloadedSize} B. Discarding.`
+        )
+        try { await root.removeEntry(cacheFilename) } catch { /* ignore */ }
+        try { await root.removeEntry(metaFilename) } catch { /* ignore */ }
+        return null
+      }
+
+      // ── 4. Validate: disk size matches what the server promised ─────────
+      if (meta.expectedSize !== null && modelFile.size !== meta.expectedSize) {
+        console.warn(
+          `[AI Worker] Incomplete download — ` +
+          `${modelFile.size} / ${meta.expectedSize} B. Discarding.`
+        )
+        try { await root.removeEntry(cacheFilename) } catch { /* ignore */ }
+        try { await root.removeEntry(metaFilename) } catch { /* ignore */ }
+        return null
+      }
+
+      console.log(
+        `[AI Worker] Cache hit ✓ "${cacheFilename}" ` +
+        `(${(modelFile.size / 1_048_576).toFixed(1)} MB, ` +
+        `saved ${new Date(meta.savedAt).toLocaleDateString()})`
+      )
+      return modelFile
+
     } catch (err: unknown) {
       console.warn(`[AI Worker] getModelFromOPFS failed (attempts left: ${retries - 1}):`, err)
-      const errObj = err as { name?: string; message?: string };
+      const errObj = err as { name?: string; message?: string }
       if (errObj?.name === 'InvalidStateError' || errObj?.message?.includes('state cached')) {
         retries--
         if (retries > 0) {
@@ -121,6 +175,7 @@ async function getModelFromOPFS(cacheFilename: string): Promise<File | null> {
 }
 
 async function downloadAndCacheModel(modelUrl: string, cacheFilename: string): Promise<File> {
+  const metaFilename = cacheFilename + '.meta'
   const response = await fetch(modelUrl)
   if (!response.ok) {
     throw new Error(`Download failed: ${response.status} ${response.statusText}`)
@@ -189,6 +244,25 @@ async function downloadAndCacheModel(modelUrl: string, cacheFilename: string): P
     }
     accessHandle.flush()
     accessHandle.close()
+
+    // Write sidecar meta file so future reads can validate integrity
+    const meta: ModelMeta = {
+      url: modelUrl,
+      downloadedSize: receivedBytes,
+      expectedSize: contentLength > 0 ? contentLength : null,
+      savedAt: Date.now(),
+    }
+    try {
+      const metaHandle = await root.getFileHandle(metaFilename, { create: true })
+      const metaWritable = await metaHandle.createWritable()
+      await metaWritable.write(JSON.stringify(meta, null, 2))
+      await metaWritable.close()
+      console.log(`[AI Worker] Meta written: ${metaFilename}`)
+    } catch (metaErr) {
+      // Non-fatal: next load will just discard the model and re-download
+      console.warn('[AI Worker] Failed to write meta file:', metaErr)
+    }
+
     console.log(`[AI Worker] Download complete: ${cacheFilename} (${(receivedBytes / 1_048_576).toFixed(1)} MB)`)
   } catch (error) {
     try {
@@ -208,9 +282,11 @@ async function clearCache(modelUrl?: string) {
   try {
     const root = await navigator.storage.getDirectory()
     if (modelUrl) {
-      await root.removeEntry(getCacheFilename(modelUrl))
+      const cacheFilename = getCacheFilename(modelUrl)
+      try { await root.removeEntry(cacheFilename) } catch { /* ignore */ }
+      try { await root.removeEntry(cacheFilename + '.meta') } catch { /* ignore */ }
     } else {
-      const knownExtensions = ['.task', '.litertlm', '.bin']
+      const knownExtensions = ['.task', '.litertlm', '.bin', '.meta']
       for await (const entry of root.values()) {
         if (entry.kind === 'file') {
           const isModelFile = knownExtensions.some(ext => entry.name.toLowerCase().endsWith(ext))
@@ -317,8 +393,24 @@ async function handleInit(modelUrl: string) {
   } catch (error: unknown) {
     isInitializing = false
     console.error('[AI Worker] Init error:', error)
-    
+
     let userFriendlyError = (error as Error)?.message ?? String(error)
+
+    // Corrupted/incomplete cached file — auto-delete and retry once
+    if (userFriendlyError.toLowerCase().includes('data size') ||
+        userFriendlyError.toLowerCase().includes('too small')) {
+      console.warn('[AI Worker] Detected corrupted cache, clearing and retrying...')
+      self.postMessage({ type: 'STATUS', status: 'downloading', stage: 'Clearing corrupted cache…' })
+      try {
+        const root = await navigator.storage.getDirectory()
+        try { await root.removeEntry(cacheFilename) } catch { /* ignore */ }
+        try { await root.removeEntry(cacheFilename + '.meta') } catch { /* ignore */ }
+        console.log('[AI Worker] Corrupted file removed, restarting init')
+      } catch { /* ignore */ }
+      // Restart init — will download fresh
+      await handleInit(modelUrl)
+      return
+    }
     if (
       userFriendlyError.includes('Audio options should not be null') ||
       userFriendlyError.includes('Audio input not supported') ||
