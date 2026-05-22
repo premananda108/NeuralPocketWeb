@@ -374,7 +374,7 @@ async function handleInit(modelUrl: string) {
     self.postMessage({ type: 'STATUS', status: 'initializing', stage: 'Initializing Gemma on GPU...' })
     llmInstance = await LlmInferenceClass.createFromOptions(genaiFileset, {
       baseOptions: { modelAssetPath: blobUrl },
-      maxTokens: 2048,
+      maxTokens: 8192,
       temperature: 0.7,
       maxNumImages: 1, // Enable multimodal (vision) support in the engine
       supportAudio: true, // Enable multimodal (audio) support in the engine
