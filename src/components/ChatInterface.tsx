@@ -572,20 +572,28 @@ export default function ChatInterface({
 
   /* ── stream → source chat ── */
   useEffect(() => {
-    // Only commit the final text to the persistent state when generation completes
-    if (!isGenerating && streamingId && streamingChatId && streamingText) {
+    // Commit (or clean up) the streaming message when generation stops.
+    // streamingId is cleared synchronously by handleAbort, so if it's null here
+    // the abort already handled the cleanup — skip to avoid double-commit.
+    if (!isGenerating && streamingId && streamingChatId) {
       const timer = setTimeout(() => {
         setAllChats(prev => prev.map(chat => {
           if (chat.id !== streamingChatId) return chat;
           return {
             ...chat,
-            messages: chat.messages.map(msg =>
-              msg.id === streamingId
-                ? { ...msg, text: streamingText, isStreaming: false }
-                : msg
-            ),
+            messages: streamingText
+              // Generation completed normally — commit the final text
+              ? chat.messages.map(msg =>
+                  msg.id === streamingId
+                    ? { ...msg, text: streamingText, isStreaming: false }
+                    : msg
+                )
+              // Generation produced no text (e.g. immediate abort) — remove empty bubble
+              : chat.messages.filter(msg => msg.id !== streamingId),
           };
         }));
+        setStreamingId(null);
+        setStreamingChatId(null);
       }, 0);
       return () => clearTimeout(timer);
     }
@@ -606,27 +614,49 @@ export default function ChatInterface({
     setAllChats(prev => prev.map(c => c.id === chatId ? updater(c) : c));
   }, []);
 
-  const handleNewChat = useCallback(() => {
-    if (isGenerating) {
-      onAbort();
+  /**
+   * Abort the current generation and immediately clean up:
+   * - If partial text exists → keep it and mark the message as done.
+   * - If no text yet → remove the empty AI bubble from the chat.
+   * Clears streamingId/streamingChatId so the commit-effect is skipped (no double-write).
+   */
+  const handleAbort = useCallback(() => {
+    onAbort(); // sends ABORT to worker + sets isGenerating=false in the hook
+    if (streamingId && streamingChatId) {
+      const capturedText = streamingText; // capture before state changes
+      setAllChats(prev => prev.map(chat => {
+        if (chat.id !== streamingChatId) return chat;
+        return {
+          ...chat,
+          messages: capturedText
+            ? chat.messages.map(msg =>
+                msg.id === streamingId
+                  ? { ...msg, text: capturedText, isStreaming: false }
+                  : msg
+              )
+            : chat.messages.filter(msg => msg.id !== streamingId),
+        };
+      }));
+      // Clear synchronously so the commit-effect (which depends on isGenerating)
+      // sees null streamingId and skips — preventing a double-commit.
+      setStreamingId(null);
+      setStreamingChatId(null);
     }
+  }, [onAbort, streamingId, streamingChatId, streamingText]);
+
+  const handleNewChat = useCallback(() => {
+    if (isGenerating) handleAbort();
     const chat = createChat();
     setAllChats(prev => [chat, ...prev]);
     setActiveChatId(chat.id);
     onReset();
-    setStreamingId(null);
-    setStreamingChatId(null);
-  }, [onReset, onAbort, isGenerating]);
+  }, [onReset, handleAbort, isGenerating]);
 
   const handleSelectChat = useCallback((id: string) => {
-    if (isGenerating) {
-      onAbort();
-    }
+    if (isGenerating) handleAbort();
     setActiveChatId(id);
     onReset();
-    setStreamingId(null);
-    setStreamingChatId(null);
-  }, [onReset, onAbort, isGenerating]);
+  }, [onReset, handleAbort, isGenerating]);
 
   const handleDeleteChat = useCallback((id: string) => {
     setAllChats(prev => {
@@ -941,7 +971,7 @@ export default function ChatInterface({
           />
 
           {isGenerating ? (
-            <button type="button" className="stop-btn" onClick={onAbort} id="abort-btn" aria-label="Stop">
+            <button type="button" className="stop-btn" onClick={handleAbort} id="abort-btn" aria-label="Stop">
               <IconStop />
             </button>
           ) : (
