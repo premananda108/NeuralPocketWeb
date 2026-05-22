@@ -48,6 +48,27 @@ if (typeof (self as unknown as Record<string, unknown>).AudioContext === 'undefi
 
 // ─── Message handler ───────────────────────────────────────────────────────
 
+// ─── Catch unhandled promise rejections from MediaPipe internals ─────────────
+// MediaPipe's WASM/bundle code sometimes rejects promises outside our try/catch
+// (e.g. "Cannot close an errored readable stream" from genai_bundle.mjs).
+// Without this handler the error is "Uncaught" and the UI stays stuck forever.
+self.addEventListener('unhandledrejection', (event: PromiseRejectionEvent) => {
+  const msg = (event.reason as Error)?.message ?? String(event.reason)
+  console.error('[AI Worker] Unhandled rejection (MediaPipe internal):', msg)
+  event.preventDefault() // suppress the browser console "Uncaught" noise
+
+  if (isInitializing) {
+    isInitializing = false
+    self.postMessage({
+      type: 'INIT_ERROR',
+      error: `AI runtime error: ${msg}\n\nTry clearing the cached model and reloading.`,
+    })
+  } else if (isGenerating) {
+    isGenerating = false
+    self.postMessage({ type: 'ERROR', error: `Inference error: ${msg}` })
+  }
+})
+
 self.onmessage = async (event: MessageEvent) => {
   const { type, modelUrl, text, imageBase64, audioRaw, systemPrompt, history } = event.data
   console.log(`[AI Worker] Received event: ${type}`, { modelUrl })
